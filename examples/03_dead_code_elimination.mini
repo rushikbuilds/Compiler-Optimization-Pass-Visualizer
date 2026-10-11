@@ -1,0 +1,4 @@
+let x = 10;
+x = 20;
+let y = 99;
+print(x);

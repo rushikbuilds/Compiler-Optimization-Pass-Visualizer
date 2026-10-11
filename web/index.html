@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compiler Optimization Pass Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Top Navigation Bar -->
+  <header class="app-header">
+    <div class="header-brand">
+      <div class="logo-icon">⚡</div>
+      <div class="brand-text">
+        <h1>Compiler Optimization Pass Visualizer</h1>
+        <span class="sub-badge">TAC IR Engine &bull; Fixed-Point Pipeline &bull; Semantic Verifier</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="badge-role">NVIDIA SE Intern &bull; Compiler Verification</div>
+      <button id="btn-export-json" class="btn btn-secondary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export JSON
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-layout">
+    <!-- Left Column: Source Editor & Configuration -->
+    <section class="panel editor-panel">
+      <div class="panel-header">
+        <div class="panel-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          Source Code (Mini-Lang)
+        </div>
+        <div class="preset-wrapper">
+          <label for="example-select">Example:</label>
+          <select id="example-select" class="select-input">
+            <option value="cf">01 - Constant Folding</option>
+            <option value="cp">02 - Constant Propagation</option>
+            <option value="dce">03 - Dead Code Elimination</option>
+            <option value="combined" selected>04 - Combined Optimization</option>
+            <option value="cond">05 - Conditionals & Branching</option>
+            <option value="err">06 - Error Diagnostics</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="editor-container">
+        <div class="line-numbers" id="editor-linenums">1<br>2<br>3<br>4<br>5</div>
+        <textarea id="code-editor" spellcheck="false" placeholder="Write mini-lang code here..."></textarea>
+      </div>
+
+      <!-- Controls & Pass Flags -->
+      <div class="controls-panel">
+        <div class="controls-group">
+          <span class="control-label">Optimization Passes:</span>
+          <div class="checkbox-group">
+            <label class="checkbox-item">
+              <input type="checkbox" id="pass-cf" checked>
+              <span class="custom-chk"></span>
+              Constant Folding
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" id="pass-cp" checked>
+              <span class="custom-chk"></span>
+              Constant Propagation
+            </label>
+            <label class="checkbox-item">
+              <input type="checkbox" id="pass-dce" checked>
+              <span class="custom-chk"></span>
+              Dead Code Elimination
+            </label>
+          </div>
+        </div>
+
+        <div class="compile-actions">
+          <button id="btn-compile" class="btn btn-primary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            Compile &amp; Optimize
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Right Column: Visualizer Pipeline & IR Diff -->
+    <section class="panel visualizer-panel">
+      <!-- Optimization Metrics Bar -->
+      <div class="metrics-bar" id="metrics-bar">
+        <div class="metric-card">
+          <span class="metric-label">Status</span>
+          <span class="metric-value status-success" id="metric-status">Ready</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Initial Instructions</span>
+          <span class="metric-value" id="metric-init-count">-</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Final Instructions</span>
+          <span class="metric-value" id="metric-final-count">-</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Instruction Reduction</span>
+          <span class="metric-value highlight-accent" id="metric-reduction">-</span>
+        </div>
+        <div class="metric-card">
+          <span class="metric-label">Semantics Verifier</span>
+          <span class="metric-value" id="metric-verifier">-</span>
+        </div>
+      </div>
+
+      <!-- Pipeline Stepper Track -->
+      <div class="pipeline-section">
+        <div class="section-subtitle">
+          <span>OPTIMIZATION PASS PIPELINE</span>
+          <span class="step-counter" id="step-counter">Step 0 of 0</span>
+        </div>
+        <div class="stepper-track" id="stepper-track">
+          <!-- Dynamically populated steps -->
+          <div class="stepper-node active">Initial IR</div>
+        </div>
+      </div>
+
+      <!-- IR Diff Viewer -->
+      <div class="diff-container">
+        <div class="diff-pane">
+          <div class="pane-header">
+            <span class="pane-tag before">INPUT IR</span>
+            <span class="pane-title" id="diff-before-title">Initial TAC IR</span>
+          </div>
+          <div class="ir-code-view" id="ir-before-view">
+            <div class="placeholder-msg">Click "Compile & Optimize" to inspect intermediate representation.</div>
+          </div>
+        </div>
+
+        <div class="diff-divider">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+        </div>
+
+        <div class="diff-pane">
+          <div class="pane-header">
+            <span class="pane-tag after">OUTPUT IR</span>
+            <span class="pane-title" id="diff-after-title">Pass Transformed IR</span>
+          </div>
+          <div class="ir-code-view" id="ir-after-view">
+            <div class="placeholder-msg">Optimization pass transformations will appear here.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lower Panels: Transformation Log & Verifier Output -->
+      <div class="lower-tabs-section">
+        <div class="tab-buttons">
+          <button class="tab-btn active" data-tab="tab-explanations">Transformation Log (<span id="log-count">0</span>)</button>
+          <button class="tab-btn" data-tab="tab-verification">Execution Verification</button>
+          <button class="tab-btn" data-tab="tab-tokens">Lexer Tokens</button>
+          <button class="tab-btn" data-tab="tab-diagnostics">Diagnostics (<span id="diag-count">0</span>)</button>
+        </div>
+
+        <div class="tab-content active" id="tab-explanations">
+          <div class="log-list" id="log-list">
+            <div class="empty-log">No transformations applied yet.</div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-verification">
+          <div class="verification-grid">
+            <div class="verify-box">
+              <h4>Initial IR Output (Unoptimized)</h4>
+              <pre id="verify-before-out" class="output-console">// No execution</pre>
+            </div>
+            <div class="verify-box">
+              <h4>Final IR Output (Optimized)</h4>
+              <pre id="verify-after-out" class="output-console">// No execution</pre>
+            </div>
+            <div class="verify-summary" id="verify-summary">
+              Semantic Equivalence: <strong>Pending</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-tokens">
+          <div class="tokens-container" id="tokens-container">
+            <span class="empty-log">Token stream will be listed here.</span>
+          </div>
+        </div>
+
+        <div class="tab-content" id="tab-diagnostics">
+          <div class="diagnostics-list" id="diagnostics-list">
+            <div class="empty-log">No compiler warnings or errors reported.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

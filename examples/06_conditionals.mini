@@ -1,0 +1,9 @@
+let x = 10;
+let y = 20;
+if (x < y) {
+    let z = x + y;
+    print(z);
+} else {
+    let w = 0;
+    print(w);
+}

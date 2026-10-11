@@ -1,0 +1,5 @@
+let a = 2 * 3;
+let b = a + 4;
+let c = 100;
+let d = b * 2;
+print(d);
