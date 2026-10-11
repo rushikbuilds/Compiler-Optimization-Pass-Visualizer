@@ -1,5 +1,6 @@
 #include "parser.h"
 
+#include <limits>
 #include <iostream>
 
 Parser::Parser(std::vector<Token> tokens) : tokens_(std::move(tokens)) {}
@@ -235,8 +236,13 @@ ExprPtr Parser::parsePrimary() {
         Token tok = advance();
         int32_t val = 0;
         try {
-            val = static_cast<int32_t>(std::stoll(tok.value));
-        } catch (...) {
+            const long long parsed = std::stoll(tok.value);
+            if (parsed < std::numeric_limits<int32_t>::min() ||
+                parsed > std::numeric_limits<int32_t>::max()) {
+                throw std::out_of_range("int32");
+            }
+            val = static_cast<int32_t>(parsed);
+        } catch (const std::exception&) {
             reportError("Integer literal out of range: " + tok.value, tok);
         }
         return makeExpr(IntLiteral{val, tok.line, tok.column});

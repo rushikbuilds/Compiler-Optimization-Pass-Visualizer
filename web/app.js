@@ -140,7 +140,8 @@ function renderIRList(irList, prevList = null) {
 
     if (instr.eliminated) {
       lineClass += " eliminated";
-      tagHtml = `<span class="line-tag tag-elim">Eliminated</span>`;
+      const newlyEliminated = !prevList || !prevList[idx] || !prevList[idx].eliminated;
+      tagHtml = `<span class="line-tag tag-elim">${newlyEliminated ? "Removed here" : "Previously removed"}</span>`;
     } else if (prevList && prevList[idx]) {
       const prev = prevList[idx];
       if (prev.text !== instr.text) {
@@ -185,7 +186,7 @@ function selectStep(stepIdx) {
 
   if (stepIdx === 0) {
     // Initial IR view
-    diffBeforeTitle.textContent = "Raw Lowered AST";
+    diffBeforeTitle.textContent = "Initial TAC IR";
     diffAfterTitle.textContent = "Initial TAC IR";
     irBeforeView.innerHTML = renderIRList(currentReport.initial_ir);
     irAfterView.innerHTML = renderIRList(currentReport.initial_ir);
@@ -257,7 +258,12 @@ function updateVerification(report) {
   verifyBeforeOut.textContent = beforeOut.length ? beforeOut.join("\n") : "// (No print outputs)";
   verifyAfterOut.textContent = afterOut.length ? afterOut.join("\n") : "// (No print outputs)";
 
-  if (report.results_match) {
+  if (!report.success) {
+    verifySummary.innerHTML = `<strong>Compilation or execution failed</strong>`;
+    verifySummary.style.color = "var(--accent-red)";
+    metricVerifier.textContent = "FAILED ❌";
+    metricVerifier.style.color = "var(--accent-red)";
+  } else if (report.results_match) {
     verifySummary.innerHTML = `Semantic Equivalence: <strong>PASS ✅ (Output before == Output after)</strong>`;
     verifySummary.style.color = "var(--accent-green)";
     metricVerifier.textContent = "VERIFIED ✅";
@@ -267,6 +273,26 @@ function updateVerification(report) {
     verifySummary.style.color = "var(--accent-red)";
     metricVerifier.textContent = "MISMATCH ❌";
     metricVerifier.style.color = "var(--accent-red)";
+  }
+
+  function resetReportView() {
+    currentReport = null;
+    currentStepIdx = 0;
+    metricInitCount.textContent = "-";
+    metricFinalCount.textContent = "-";
+    metricReduction.textContent = "-";
+    metricVerifier.textContent = "-";
+    stepCounter.textContent = "Step 0 of 0";
+    stepperTrack.innerHTML = `<div class="stepper-node active">Initial IR</div>`;
+    irBeforeView.innerHTML = `<div class="placeholder-msg">No IR available.</div>`;
+    irAfterView.innerHTML = `<div class="placeholder-msg">No IR available.</div>`;
+    diffBeforeTitle.textContent = "Initial TAC IR";
+    diffAfterTitle.textContent = "Pass Transformed IR";
+    logList.innerHTML = `<div class="empty-log">No transformations applied.</div>`;
+    logCount.textContent = "0";
+    verifyBeforeOut.textContent = "// No execution";
+    verifyAfterOut.textContent = "// No execution";
+    verifySummary.innerHTML = "Semantic Equivalence: <strong>Pending</strong>";
   }
 }
 
@@ -334,6 +360,9 @@ async function compileAndOptimize() {
       updateTokens(data.tokens);
       irBeforeView.innerHTML = renderIRList(data.initial_ir);
       irAfterView.innerHTML = `<div class="placeholder-msg" style="color:var(--accent-red)">Compilation halted due to diagnostics.</div>`;
+      updateVerification(data);
+      stepperTrack.innerHTML = `<div class="stepper-node active">Compilation failed</div>`;
+      stepCounter.textContent = "Step 0 of 0";
       // Switch to diagnostics tab
       document.querySelector('[data-tab="tab-diagnostics"]').click();
       return;
@@ -351,7 +380,7 @@ async function compileAndOptimize() {
 
     const diff = initActive - finalActive;
     const pct = initActive > 0 ? Math.round((diff / initActive) * 100) : 0;
-    metricReduction.textContent = diff > 0 ? `-${pct}% (${diff} instrs)` : "0%";
+    metricReduction.textContent = diff > 0 ? `${pct}% fewer (${diff} removed)` : "0%";
 
     buildPipeline(data);
     updateVerification(data);
@@ -360,11 +389,12 @@ async function compileAndOptimize() {
 
   } catch (err) {
     console.error("Compilation error:", err);
+    resetReportView();
     metricStatus.textContent = "Network Error";
     metricStatus.style.color = "var(--accent-red)";
   } finally {
     btnCompile.disabled = false;
-    btnCompile.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg> Compile &amp; Optimize`;
+    btnCompile.innerHTML = "Compile &amp; Optimize";
   }
 }
 

@@ -7,6 +7,18 @@ OptimizationResult DeadCodeEliminationPass::run(IRProgram& ir) {
     OptimizationResult res;
     res.changed = false;
 
+    // Linear liveness is not sound across joins: a definition in one branch
+    // may be required by a use reached through another branch.
+    for (const auto& instr : ir) {
+        if (instr.opcode == IROpcode::LABEL ||
+            instr.opcode == IROpcode::JUMP ||
+            instr.opcode == IROpcode::JUMP_IF_ZERO) {
+            res.explanations.push_back(
+                "Skipped DCE because control-flow-aware liveness is required");
+            return res;
+        }
+    }
+
     // Backward liveness analysis
     // Variables/temporaries that are live at the current program point.
     std::unordered_set<std::string> live_vars;
@@ -34,6 +46,19 @@ OptimizationResult DeadCodeEliminationPass::run(IRProgram& ir) {
             if (!instr.arg1.is_const && !instr.arg1.var_name.empty()) {
                 live_vars.insert(instr.arg1.var_name);
             }
+            continue;
+        }
+
+        // Division and modulo can fail at runtime even when their result is
+        // unused, so removing them would change observable behavior.
+        if (instr.opcode == IROpcode::DIV || instr.opcode == IROpcode::MOD) {
+            if (!instr.arg1.is_const && !instr.arg1.var_name.empty()) {
+                live_vars.insert(instr.arg1.var_name);
+            }
+            if (!instr.arg2.is_const && !instr.arg2.var_name.empty()) {
+                live_vars.insert(instr.arg2.var_name);
+            }
+            if (!instr.dest.empty()) live_vars.erase(instr.dest);
             continue;
         }
 

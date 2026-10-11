@@ -26,11 +26,16 @@ private:
     std::string newLabel(const std::string& prefix = "L");
     void emit(IROpcode opcode, const std::string& dest, IRValue arg1 = IRValue::none(),
               IRValue arg2 = IRValue::none(), const std::string& label = "", int line = 0);
+    bool isDeclared(const std::string& name) const;
+    bool isInitialized(const std::string& name) const;
+    void pushScope();
+    void popScope();
 
     int                       temp_counter_ = 0;
     int                       label_counter_ = 0;
     int                       instr_id_ = 1;
     IRProgram                 instructions_;
     std::vector<CompileError> errors_;
-    std::unordered_set<std::string> declared_vars_;
+    std::vector<std::unordered_set<std::string>> scopes_;
+    std::unordered_set<std::string> initialized_vars_;
 };

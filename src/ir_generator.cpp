@@ -4,6 +4,30 @@
 
 IRGenerator::IRGenerator() {}
 
+bool IRGenerator::isDeclared(const std::string& name) const {
+    for (auto it = scopes_.rbegin(); it != scopes_.rend(); ++it) {
+        if (it->find(name) != it->end()) return true;
+    }
+    return false;
+}
+
+bool IRGenerator::isInitialized(const std::string& name) const {
+    return initialized_vars_.find(name) != initialized_vars_.end();
+}
+
+void IRGenerator::pushScope() {
+    scopes_.emplace_back();
+}
+
+void IRGenerator::popScope() {
+    if (!scopes_.empty()) {
+        for (const auto& name : scopes_.back()) {
+            initialized_vars_.erase(name);
+        }
+        scopes_.pop_back();
+    }
+}
+
 std::string IRGenerator::newTemp() {
     return "t" + std::to_string(++temp_counter_);
 }
@@ -28,7 +52,9 @@ void IRGenerator::emit(IROpcode opcode, const std::string& dest, IRValue arg1,
 IRProgram IRGenerator::generate(const Program& program) {
     instructions_.clear();
     errors_.clear();
-    declared_vars_.clear();
+    scopes_.clear();
+    initialized_vars_.clear();
+    pushScope();
     temp_counter_ = 0;
     label_counter_ = 0;
     instr_id_ = 1;
@@ -47,8 +73,16 @@ void IRGenerator::generateStmt(const Stmt& stmt) {
         using T = std::decay_t<decltype(s)>;
 
         if constexpr (std::is_same_v<T, LetStmt>) {
-            declared_vars_.insert(s.name);
+            if (scopes_.back().find(s.name) != scopes_.back().end()) {
+                errors_.push_back(CompileError{
+                    "Redeclaration of variable '" + s.name + "'",
+                    s.line, 0, "ir_generator"
+                });
+                return;
+            }
             IRValue init_val = generateExpr(*s.init);
+            scopes_.back().insert(s.name);
+            initialized_vars_.insert(s.name);
             if (init_val.is_const) {
                 emit(IROpcode::CONST, s.name, init_val, IRValue::none(), "", s.line);
             } else {
@@ -56,13 +90,14 @@ void IRGenerator::generateStmt(const Stmt& stmt) {
             }
         }
         else if constexpr (std::is_same_v<T, AssignStmt>) {
-            if (declared_vars_.find(s.name) == declared_vars_.end()) {
+            if (!isDeclared(s.name)) {
                 errors_.push_back(CompileError{
                     "Assignment to undeclared variable '" + s.name + "'",
                     s.line, 0, "ir_generator"
                 });
             }
             IRValue val = generateExpr(*s.value);
+            initialized_vars_.insert(s.name);
             if (val.is_const) {
                 emit(IROpcode::CONST, s.name, val, IRValue::none(), "", s.line);
             } else {
@@ -82,9 +117,14 @@ void IRGenerator::generateStmt(const Stmt& stmt) {
             emit(IROpcode::JUMP_IF_ZERO, "", cond_val, IRValue::none(), else_label, s.line);
 
             // Then branch
+            const auto initialized_before = initialized_vars_;
+            pushScope();
             for (const auto& then_stmt : s.then_block) {
                 if (then_stmt) generateStmt(*then_stmt);
             }
+            const auto initialized_then = initialized_vars_;
+            popScope();
+            initialized_vars_ = initialized_before;
 
             if (!s.else_block.empty()) {
                 emit(IROpcode::JUMP, "", IRValue::none(), IRValue::none(), end_label, s.line);
@@ -94,8 +134,20 @@ void IRGenerator::generateStmt(const Stmt& stmt) {
             emit(IROpcode::LABEL, "", IRValue::none(), IRValue::none(), else_label, s.line);
 
             // Else branch
+            pushScope();
             for (const auto& else_stmt : s.else_block) {
                 if (else_stmt) generateStmt(*else_stmt);
+            }
+            const auto initialized_else = initialized_vars_;
+            popScope();
+            initialized_vars_ = initialized_before;
+            if (!s.else_block.empty()) {
+                for (const auto& name : initialized_before) {
+                    if (initialized_then.find(name) != initialized_then.end() &&
+                        initialized_else.find(name) != initialized_else.end()) {
+                        initialized_vars_.insert(name);
+                    }
+                }
             }
 
             if (!s.else_block.empty()) {
@@ -113,9 +165,14 @@ IRValue IRGenerator::generateExpr(const Expr& expr) {
             return IRValue::makeConst(e.value);
         }
         else if constexpr (std::is_same_v<T, VarRef>) {
-            if (declared_vars_.find(e.name) == declared_vars_.end()) {
+            if (!isDeclared(e.name)) {
                 errors_.push_back(CompileError{
                     "Use of undeclared variable '" + e.name + "'",
+                    e.line, e.col, "ir_generator"
+                });
+            } else if (!isInitialized(e.name)) {
+                errors_.push_back(CompileError{
+                    "Use of uninitialized variable '" + e.name + "'",
                     e.line, e.col, "ir_generator"
                 });
             }

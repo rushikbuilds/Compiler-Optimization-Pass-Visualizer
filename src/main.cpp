@@ -8,8 +8,11 @@
 #include "parser.h"
 
 #include <fstream>
+#include <limits>
 #include <iostream>
 #include <memory>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -19,6 +22,14 @@ int main(int argc, char* argv[]) {
     bool enable_dce = true;
     int max_iterations = 10;
     std::string input_file;
+    CompilationReport report;
+
+    auto argumentError = [&](const std::string& message) {
+        report.success = false;
+        report.errors.push_back(CompileError{message, 0, 0, "cli"});
+        std::cout << JSONOutput::serialize(report);
+        return 2;
+    };
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -28,8 +39,19 @@ int main(int argc, char* argv[]) {
         else if (arg == "--cf") enable_cf = true;
         else if (arg == "--cp") enable_cp = true;
         else if (arg == "--dce") enable_dce = true;
-        else if (arg == "--max-iterations" && i + 1 < argc) {
-            max_iterations = std::stoi(argv[++i]);
+        else if (arg == "--max-iterations") {
+            if (i + 1 >= argc) {
+                return argumentError("Missing value for --max-iterations");
+            }
+            try {
+                const long long parsed = std::stoll(argv[++i]);
+                if (parsed < 1 || parsed > 1000) {
+                    return argumentError("--max-iterations must be between 1 and 1000");
+                }
+                max_iterations = static_cast<int>(parsed);
+            } catch (const std::exception&) {
+                return argumentError("Invalid integer value for --max-iterations");
+            }
         } else if (arg == "-h" || arg == "--help") {
             std::cout << "Usage: compiler [options] [file.mini]\n"
                       << "Options:\n"
@@ -38,8 +60,13 @@ int main(int argc, char* argv[]) {
                       << "  --[no-]dce           Enable/disable Dead Code Elimination (default: enabled)\n"
                       << "  --max-iterations N   Max fixed-point iterations (default: 10)\n";
             return 0;
-        } else if (arg[0] != '-') {
+        } else if (!arg.empty() && arg[0] != '-') {
+            if (!input_file.empty()) {
+                return argumentError("Only one input file may be specified");
+            }
             input_file = arg;
+        } else {
+            return argumentError("Unknown option '" + arg + "'");
         }
     }
 
@@ -59,7 +86,6 @@ int main(int argc, char* argv[]) {
         source = ss.str();
     }
 
-    CompilationReport report;
     report.source = source;
 
     // 1. Lexing
@@ -143,6 +169,19 @@ int main(int argc, char* argv[]) {
     // 7. Verify Equivalence
     report.results_match = (report.exec_before.success == report.exec_after.success) &&
                            (report.exec_before.output == report.exec_after.output);
+    if (!report.exec_before.success || !report.exec_after.success) {
+        report.success = false;
+        if (!report.exec_before.success) {
+            report.errors.push_back(CompileError{
+                report.exec_before.error_message, 0, 0, "runtime_before"
+            });
+        }
+        if (!report.exec_after.success) {
+            report.errors.push_back(CompileError{
+                report.exec_after.error_message, 0, 0, "runtime_after"
+            });
+        }
+    }
 
     std::cout << JSONOutput::serialize(report, &ast);
     return 0;

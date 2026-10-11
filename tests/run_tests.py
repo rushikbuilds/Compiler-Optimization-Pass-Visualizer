@@ -79,6 +79,67 @@ def test_error_diagnostics():
     assert "undeclared variable 'b'" in data["errors"][0]["message"]
     print("  -> Passed!")
 
+def test_branch_dce_preserves_output():
+    print("[TEST] Running Branch DCE Safety Verification...")
+    src = "let x = 0;\nif (1) { x = 1; } else { x = 2; }\nprint(x);\n"
+    res = run_compiler(stdin_text=src)
+    assert res.returncode == 0
+    data = json.loads(res.stdout)
+    assert data["success"] is True
+    assert data["results_match"] is True
+    assert data["execution_before"]["output"] == ["1"]
+    assert data["execution_after"]["output"] == ["1"]
+    print("  -> Passed!")
+
+def test_dce_preserves_runtime_faults():
+    print("[TEST] Running Runtime Fault Preservation Verification...")
+    src = "let unused = 1 / 0;\nprint(7);\n"
+    res = run_compiler(stdin_text=src)
+    assert res.returncode == 0
+    data = json.loads(res.stdout)
+    assert data["success"] is False
+    assert data["execution_before"]["success"] is False
+    assert data["execution_after"]["success"] is False
+    assert data["results_match"] is True
+    print("  -> Passed!")
+
+def test_integer_range_diagnostics():
+    print("[TEST] Running Integer Range Verification...")
+    src = "let x = 2147483648;\nprint(x);\n"
+    res = run_compiler(stdin_text=src)
+    assert res.returncode == 0
+    data = json.loads(res.stdout)
+    assert data["success"] is False
+    assert any("out of range" in e["message"] for e in data["errors"])
+    print("  -> Passed!")
+
+def test_cli_argument_diagnostics():
+    print("[TEST] Running CLI Argument Verification...")
+    res = run_compiler(["--max-iterations", "invalid"], "print(1);\n")
+    assert res.returncode != 0
+    data = json.loads(res.stdout)
+    assert data["success"] is False
+    assert data["errors"][0]["phase"] == "cli"
+    print("  -> Passed!")
+
+def test_scope_and_definite_assignment():
+    print("[TEST] Running Scope and Definite Assignment Verification...")
+    res = run_compiler(stdin_text="if (0) { let x = 1; }\nprint(x);\n")
+    assert res.returncode == 0
+    data = json.loads(res.stdout)
+    assert data["success"] is False
+    assert any("undeclared variable 'x'" in e["message"] for e in data["errors"])
+    print("  -> Passed!")
+
+def test_redeclaration_diagnostics():
+    print("[TEST] Running Redeclaration Verification...")
+    res = run_compiler(stdin_text="let x = 1;\nlet x = 2;\nprint(x);\n")
+    assert res.returncode == 0
+    data = json.loads(res.stdout)
+    assert data["success"] is False
+    assert any("Redeclaration" in e["message"] for e in data["errors"])
+    print("  -> Passed!")
+
 def main():
     if not os.path.exists(COMPILER_BIN):
         print(f"Error: {COMPILER_BIN} not found. Build the project first.")
@@ -93,6 +154,12 @@ def main():
         test_dead_code_elimination,
         test_combined_fixed_point,
         test_error_diagnostics,
+        test_branch_dce_preserves_output,
+        test_dce_preserves_runtime_faults,
+        test_integer_range_diagnostics,
+        test_cli_argument_diagnostics,
+        test_scope_and_definite_assignment,
+        test_redeclaration_diagnostics,
     ]
 
     failed = 0
@@ -105,7 +172,7 @@ def main():
 
     print("========================================")
     if failed == 0:
-        print("ALL TESTS PASSED! (5/5)")
+        print(f"ALL TESTS PASSED! ({len(tests)}/{len(tests)})")
         sys.exit(0)
     else:
         print(f"{failed} tests failed.")

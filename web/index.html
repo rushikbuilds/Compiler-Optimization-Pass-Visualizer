@@ -13,16 +13,13 @@
   <!-- Top Navigation Bar -->
   <header class="app-header">
     <div class="header-brand">
-      <div class="logo-icon">⚡</div>
       <div class="brand-text">
         <h1>Compiler Optimization Pass Visualizer</h1>
         <span class="sub-badge">TAC IR Engine &bull; Fixed-Point Pipeline &bull; Semantic Verifier</span>
       </div>
     </div>
     <div class="header-actions">
-      <div class="badge-role">NVIDIA SE Intern &bull; Compiler Verification</div>
       <button id="btn-export-json" class="btn btn-secondary">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Export JSON
       </button>
     </div>
@@ -34,7 +31,6 @@
     <section class="panel editor-panel">
       <div class="panel-header">
         <div class="panel-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
           Source Code (Mini-Lang)
         </div>
         <div class="preset-wrapper">
@@ -80,7 +76,6 @@
 
         <div class="compile-actions">
           <button id="btn-compile" class="btn btn-primary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             Compile &amp; Optimize
           </button>
         </div>
@@ -137,9 +132,7 @@
           </div>
         </div>
 
-        <div class="diff-divider">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-        </div>
+        <div class="diff-divider" aria-hidden="true"></div>
 
         <div class="diff-pane">
           <div class="pane-header">
@@ -150,6 +143,12 @@
             <div class="placeholder-msg">Optimization pass transformations will appear here.</div>
           </div>
         </div>
+      </div>
+
+      <div class="diff-legend">
+        <span><i class="legend-swatch removed"></i>Removed by DCE</span>
+        <span><i class="legend-swatch changed"></i>Changed by this pass</span>
+        <span>Red rows are removed instructions, not compiler errors.</span>
       </div>
 
       <!-- Lower Panels: Transformation Log & Verifier Output -->
